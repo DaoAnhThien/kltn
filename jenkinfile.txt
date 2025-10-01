@@ -1,0 +1,66 @@
+pipeline {
+    agent any
+    
+    environment {
+        SCANNER_HOME= tool 'sonar-scanner'
+    }
+
+    stages {
+        
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/DaoAnhThien/kltn.git'
+            }
+        }
+    
+        stage('Trivy FileSystem Scan') {
+            steps {
+                sh "trivy fs --format table -o trivy-fs-report.html ."
+            }
+        }
+    
+        
+        stage('Sonarqube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar-scanner') {
+                    sh "$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=jenkins-pipeline -Dsonar.projectName=jenkins-pipeline"
+                }
+            }
+        }
+    
+        stage('Build & Tag Docker Image') {
+            steps {
+                script {
+                        withDockerRegistry(credentialsId: 'docker-cred', toolName: 'docker') {
+                            sh "docker build -t p3rryhehe/kltn:v1 ."
+                   }
+                }
+            }
+        }
+    
+        stage('Trivy Image Scan') {
+            steps {
+                sh "trivy image --format json -o trivy-image-report.json p3rryhehe/kltn:v1"
+                sh "cat trivy-image-report.json"
+            }
+        }
+        
+        stage('Push Docker Image') {
+            steps {
+                script {
+                        withDockerRegistry(credentialsId: 'docker-cred', toolName: 'docker') {
+                            sh "docker push p3rryhehe/kltn:v1 "
+                   }
+                }
+                
+            }
+        }
+    
+        stage('Deploy To Container') {
+            steps {
+                
+                sh "docker run -d -p 8083:80 p3rryhehe/kltn:v1"
+            }
+        }
+    }
+}
