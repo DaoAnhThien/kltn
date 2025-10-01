@@ -58,7 +58,17 @@ pipeline {
     
         stage('Deploy To Container') {
             steps {
-                
+                sh '''
+                        # Tìm PID của process đang dùng port 8083
+                        PID=$(lsof -i :8083 -t)
+                        if [ -n "$PID" ]; then
+                            echo "Killing process on port 8083 (PID: $PID)"
+                            kill -9 $PID
+                            sleep 2  # Đợi 2 giây để process kết thúc hoàn toàn
+                        else
+                            echo "No process found on port 8083"
+                        fi
+                    '''
                 sh "docker run -d -p 8083:80 p3rryhehe/kltn:v1"
             }
         }
